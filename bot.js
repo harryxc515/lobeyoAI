@@ -11,7 +11,7 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 console.log("Telegram bot started...");
 
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "Hey 😊 I'm your AI chat bot. Talk to me!");
+  bot.sendMessage(msg.chat.id, "Hey 😊 I'm your AI chatbot. Talk with me!");
 });
 
 bot.on("message", async (msg) => {
@@ -21,17 +21,36 @@ bot.on("message", async (msg) => {
   if (!text || text.startsWith("/")) return;
 
   try {
+
     await bot.sendChatAction(chatId, "typing");
 
-    const memory = await getMemory(chatId);
-    const reply = await chat(memory, text);
+    let memory = [];
+    try {
+      memory = await getMemory(chatId);
+    } catch (dbErr) {
+      console.log("MongoDB memory error:", dbErr.message);
+    }
 
-    await saveChat(chatId, "user", text);
-    await saveChat(chatId, "assistant", reply);
+    let reply = "Hmm... I couldn't think of a reply 🤔";
+
+    try {
+      reply = await chat(memory, text);
+    } catch (aiErr) {
+      console.log("AI error:", aiErr.message);
+      reply = "AI service is not responding right now 🤖";
+    }
+
+    try {
+      await saveChat(chatId, "user", text);
+      await saveChat(chatId, "assistant", reply);
+    } catch (saveErr) {
+      console.log("MongoDB save error:", saveErr.message);
+    }
 
     bot.sendMessage(chatId, reply);
+
   } catch (err) {
-    console.error(err);
-    bot.sendMessage(chatId, "Something went wrong 😔");
+    console.log("General bot error:", err.message);
+    bot.sendMessage(chatId, "Temporary server issue. Try again later.");
   }
 });
