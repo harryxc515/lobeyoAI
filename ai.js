@@ -2,25 +2,39 @@
 const OpenAI = require("openai");
 const fs = require("fs");
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+if (!process.env.OPENAI_API_KEY) {
+  console.error("OPENAI_API_KEY is missing.");
+}
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-const personality = fs.readFileSync("./personality.txt", "utf8");
+let personality = "You are a friendly AI chatbot.";
+try {
+  personality = fs.readFileSync("./personality.txt", "utf8");
+} catch (e) {
+  console.log("personality.txt not found, using default.");
+}
 
 async function chat(memory, message) {
-  const messages = [
-    { role: "system", content: personality },
-    ...memory,
-    { role: "user", content: message },
-  ];
+  try {
+    const messages = [
+      { role: "system", content: personality },
+      ...(memory || []),
+      { role: "user", content: message }
+    ];
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages,
-  });
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: messages
+    });
 
-  return completion.choices[0].message.content;
+    return response.choices?.[0]?.message?.content || "I couldn't generate a reply.";
+  } catch (err) {
+    console.error("OpenAI error:", err.response?.data || err.message);
+    return "AI temporary error. Try again.";
+  }
 }
 
 module.exports = chat;
